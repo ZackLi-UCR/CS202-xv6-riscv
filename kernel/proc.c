@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include <limits.h>
 
 struct cpu cpus[NCPU];
 
@@ -113,6 +114,10 @@ allocproc(void)
 
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
+    p->tickets = 100;
+    p->stride = 100;
+    p->pass = 100;
+    p->ticks = 0;
     if(p->state == UNUSED) {
       goto found;
     } else {
@@ -124,7 +129,11 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-
+  p->syscall_count = 0;
+  p->tickets = 100;
+  p->stride = 100;
+  p->pass = 100;
+  p->ticks = 0;
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -445,6 +454,10 @@ void
 scheduler(void)
 {
   struct proc *p;
+  #if defined(STRIDE)
+    struct proc *nextproc;
+  #endif
+  
   struct cpu *c = mycpu();
   
   c->proc = 0;
@@ -452,22 +465,76 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    for(p = proc; p < &proc[NPROC]; p++) {
+    #if defined(LOTTERY)  
+      int total_tickets = 0;
+      int bouns_number = 0;
+      for(p = proc; p < &proc[NPROC]; p++){
+        acquire(&p->lock);
+        if(p->state == RUNNABLE){
+          total_tickets += p->ticks;
+        }
+        release(&p->lock);
+      }
+      bouns_number = rand() % total_tickets;
+      for(p = proc; p < &proc[NPROC]; p++){
+        acquire(&p->lock);
+        if(p->state == RUNNABLE){
+          if(bouns_number < p->tickets){  //find
+            p->state = RUNNING;
+            p->ticks += 1;
+            c->proc = p;
+            swtch(&c->context, &p->context);
+
+            c->proc = 0;
+            release(&p->lock);
+            break;
+          }
+          bouns_number -= p->tickets;
+        }
+        release(&p->lock);
+      }
+    #elif defined(STRIDE)
+      int min_pass = INT_MAX;
+      for(p = proc; p < &proc[NPROC]; p++){
+        if(p->state == RUNNABLE && p->pass < min_pass){
+          nextproc = p;
+          min_pass = p->pass;
+        }
+      }
+      if(min_pass == INT_MAX){
+        continue;
+      }
+      p = nextproc;
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+      if(p->state == RUNNABLE){
         p->state = RUNNING;
+        p->pass += p->stride;
+        p->ticks += 1;
         c->proc = p;
         swtch(&c->context, &p->context);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
         c->proc = 0;
       }
       release(&p->lock);
-    }
+    #else
+      for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE) {
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          p->ticks += 1;
+          c->proc = p;
+          swtch(&c->context, &p->context);
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+        }
+        release(&p->lock);
+      }
+    #endif
   }
 }
 
@@ -680,4 +747,60 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// hello: printing hello msg
+void print_hello(int n)
+{
+	printf("Hello from the kernel space %d\n", n);
+}
+
+// sysinfo: mode 0 get number of active processes
+int get_active_process(void)
+{
+	int count = 0;
+	struct proc *p;
+	
+	for(p=proc; p < &proc[NPROC]; p++){
+		acquire(&p->lock);
+		if(p->state == SLEEPING || p->state == RUNNABLE || p->state == RUNNING){
+			count++;
+		}
+		release(&p->lock);
+	}
+	
+	return count;
+}
+
+// sysinfo: mode 1 get total number of system calls since system boot up
+extern int total_syscall_count;
+int get_total_syscall(void)
+{
+	return total_syscall_count;
+}
+
+void print_sched_statistics(void)
+{
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state != UNUSED){
+      #if defined(LOTTERY)
+        printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
+      #elif defined(STRIDE)
+        printf("%d(%s): stride: %d, ticks: %d\n",p->pid,p->name,p->stride,p->ticks);
+      #else
+        printf("%d(%s): RR mode, ticks: %d\n",p->pid,p->name,p->ticks);
+      #endif
+    }
+    release(&p->lock);
+  }
+}
+
+unsigned short lfsr = 0xACE1u;
+unsigned short bit;
+unsigned short  rand(void)
+{
+  bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5)) & 1;
+  return lfsr = (lfsr >> 1) | (bit << 15);
 }

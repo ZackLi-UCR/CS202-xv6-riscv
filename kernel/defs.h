@@ -63,6 +63,7 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+int				get_free_memory_page(void); //sysinfo-2 get number of free memory pages
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -106,6 +107,11 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+void			print_hello(int); // hello
+int				get_active_process(void); //sysinfo-0 get number of active processes
+int				get_total_syscall(void); //sysinfo-1 get total number of system calls since system boot up
+void            print_sched_statistics(void); //sched_statistics
+unsigned short  rand(void); //generate pseudo random number
 
 // swtch.S
 void            swtch(struct context*, struct context*);

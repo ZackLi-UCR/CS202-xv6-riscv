@@ -104,4 +104,16 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int syscall_count;		       // system calls in process
+  int tickets;           // tickets for lottery & stride scheduler, default value is 100
+  int stride;            // stride = STRIDEK / tickets
+  int pass;              // pass += stride
+  int ticks;               // count ticks this process used
+};
+
+// pinfo struct
+struct pinfo {
+	int ppid;
+	int syscall_count;
+	int page_usage;
 };

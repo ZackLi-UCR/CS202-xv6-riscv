@@ -89,3 +89,68 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// hello syscall definition
+uint64 sys_hello(void)
+{
+	int n;
+	argint(0, &n);
+	print_hello(n);
+	return 0;
+}
+
+// sysinfo syscall definition
+extern int total_syscall_count;
+uint64 sys_sysinfo(void)
+{
+	int n;
+	argint(0, &n);
+	
+	if(n == 0){
+		int processes_count = get_active_process();
+		return processes_count;
+	} else if(n == 1){
+ 		int syscall_count = get_total_syscall() - 1;
+		return syscall_count;
+	} else if(n == 2){
+		int pages_count = get_free_memory_page();
+		return pages_count;
+	} else {
+		return -1;
+	}
+}
+
+// procinfo syscall definition
+#define NULL ((void*)0)
+uint64 sys_procinfo(void)
+{
+	uint64 pinfo;
+	argaddr(0, &pinfo);
+	struct proc *p = myproc();
+	int info[3];
+	info[0] = p->parent->pid;
+	info[1] = p->syscall_count - 1;
+	info[2] = (p->sz+PGSIZE-1)/PGSIZE;
+	return copyout(p->pagetable, pinfo, (void*)info, sizeof(int)*3);
+}
+
+// sched_statistics syscall definition
+uint64 sys_sched_statistics(void)
+{
+  print_sched_statistics();
+  return 0;
+}
+
+// set schedule tickets
+uint64 sys_sched_tickets(void)
+{
+  int n;
+  argint(0, &n);
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  p->tickets = n;
+  p->stride = (int)(STRIDEK / n);
+  p->pass = p->stride;
+  release(&p->lock);
+  return 0;
+}

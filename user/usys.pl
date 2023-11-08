@@ -36,3 +36,8 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+entry("hello"); # hello syscall for user
+entry("sysinfo"); # sysinfo syscall for user
+entry("procinfo"); # procinfo syscall for user
+entry("sched_statistics"); # sched_statistics syscall for user
+entry("sched_tickets"); # sched_tickets syscall for user

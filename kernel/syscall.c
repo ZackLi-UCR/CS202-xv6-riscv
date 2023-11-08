@@ -101,6 +101,11 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+extern uint64 sys_hello(void);  // hello: declaration
+extern uint64 sys_sysinfo(void); //sysinfo: declaration 
+extern uint64 sys_procinfo(void); //procinfo: declaration
+extern uint64 sys_sched_statistics(void); //sched_statistics: declaration
+extern uint64 sys_sched_tickets(void); //sched_tickets: declaration
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -126,7 +131,14 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_hello]   sys_hello, //hello
+[SYS_sysinfo] sys_sysinfo,  //sysinfo
+[SYS_procinfo] sys_procinfo, //procinfo
+[SYS_sched_statistics] sys_sched_statistics, //sched_statistics
+[SYS_sched_tickets] sys_sched_tickets, //sched_tickets
 };
+
+int total_syscall_count = 0; //total system calls
 
 void
 syscall(void)
@@ -135,6 +147,10 @@ syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
+  
+  total_syscall_count++; //global
+  p->syscall_count++;	 //process
+  
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
