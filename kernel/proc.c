@@ -788,7 +788,7 @@ void print_sched_statistics(void)
       #if defined(LOTTERY)
         printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
       #elif defined(STRIDE)
-        printf("%d(%s): stride: %d, ticks: %d\n",p->pid,p->name,p->stride,p->ticks);
+        printf("%d(%s): tickets: %d, stride: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->stride,p->ticks);
       #else
         printf("%d(%s): RR mode, ticks: %d\n",p->pid,p->name,p->ticks);
       #endif
